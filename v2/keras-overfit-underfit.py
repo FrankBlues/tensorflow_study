@@ -26,6 +26,7 @@ from tensorflow.keras import regularizers
 
 print(tf.__version__)
 
+# pip install git+https://github.com/tensorflow/docs
 import tensorflow_docs as tfdocs
 import tensorflow_docs.modeling
 import tensorflow_docs.plots
