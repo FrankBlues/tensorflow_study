@@ -2,6 +2,21 @@
 """
 Created on Tue Mar  8 15:45:29 2022
 
+  * layers.Normalization
+  * tf.keras.Input
+  * layers.Concatenate
+  * layers.StringLookup layers.CategoryEncoding
+  * tf.keras.Model
+  * tf.keras.utils.plot_model
+  * tf.data.Dataset.from_tensor_slices
+  * tf.data.experimental.make_csv_dataset
+  * Dataset.cache or data.experimental.snapshot
+  * tf.io.decode_csv
+  * tf.data.experimental.CsvDataset
+  * Dataset.interleave
+  * tf.data.TextLineDataset
+
+
 @author: DELL
 """
 
@@ -344,8 +359,139 @@ for n in range(9):
   plt.imshow(features['image'][..., n])
   plt.title(chr(features['m_label'][n]))
   plt.axis('off')
-  
+
 
 ### Lower level functions
-
+titanic_file_path = r'C:\Users\DELL\.keras\datasets\train.csv'
 # tf.io.decode_csv
+text = pathlib.Path(titanic_file_path).read_text()
+lines = text.split('\n')[1:-1]
+
+all_strings = [str()]*10
+# 
+features = tf.io.decode_csv(lines, record_defaults=all_strings) 
+
+for f in features:
+  print(f"type: {f.dtype.name}, shape: {f.shape}")
+
+titanic_types = [int(), str(), float(), int(), int(), float(), str(), str(), str(), str()]
+
+features = tf.io.decode_csv(lines, record_defaults=titanic_types) 
+
+for f in features:
+  print(f"type: {f.dtype.name}, shape: {f.shape}")
+
+### tf.data.experimental.CsvDataset
+simple_titanic = tf.data.experimental.CsvDataset(titanic_file_path, record_defaults=titanic_types, header=True)
+
+for example in simple_titanic.take(1):
+  print([e.numpy() for e in example])
+
+# The above code is basically equivalent to
+def decode_titanic_line(line):
+  return tf.io.decode_csv(line, titanic_types)
+
+manual_titanic = (
+    # Load the lines of text
+    tf.data.TextLineDataset(titanic_file_path)
+    # Skip the header row.
+    .skip(1)
+    # Decode the line.
+    .map(decode_titanic_line)
+)
+
+for example in manual_titanic.take(1):
+  print([e.numpy() for e in example])
+
+### Multiple files
+# determine the column types for the record_defaults
+font_line = pathlib.Path(font_csvs[0]).read_text().splitlines()[1]
+print(font_line)
+
+num_font_features = font_line.count(',')+1
+font_column_types = [str(), str()] + [float()]*(num_font_features-2)
+
+# pass the list of files to CsvDataaset
+#  reads them sequentially
+simple_font_ds = tf.data.experimental.CsvDataset(
+    font_csvs, 
+    record_defaults=font_column_types, 
+    header=True)
+
+for row in simple_font_ds.take(10):
+  print(row[0].numpy())
+
+
+# To interleave multiple files, use Dataset.interleave
+font_files = tf.data.Dataset.list_files("fonts/*.csv")
+
+print('Epoch 1:')
+for f in list(font_files)[:5]:
+  print("    ", f.numpy())
+print('    ...')
+print()
+
+print('Epoch 2:')
+for f in list(font_files)[:5]:
+  print("    ", f.numpy())
+print('    ...')
+
+# 
+def make_font_csv_ds(path):
+  return tf.data.experimental.CsvDataset(
+    path, 
+    record_defaults=font_column_types, 
+    header=True)
+# he Dataset returned by interleave returns elements by cycling over a number of the child-Datasets
+font_rows = font_files.interleave(make_font_csv_ds,
+                                  cycle_length=3)
+
+
+fonts_dict = {'font_name':[], 'character':[]}
+
+for row in font_rows.take(10):
+  fonts_dict['font_name'].append(row[0].numpy().decode())
+  fonts_dict['character'].append(chr(row[2].numpy()))
+
+# pd.DataFrame(fonts_dict)
+
+
+#### Performance
+# Earlier, it was noted that io.decode_csv is more efficient when run on a batch of strings
+BATCH_SIZE=2048
+
+
+
+fonts_ds = tf.data.experimental.make_csv_dataset(
+    file_pattern = "fonts/*.csv",
+    batch_size=BATCH_SIZE, num_epochs=1,
+    num_parallel_reads=100)
+
+timeline = []
+timeline.append(time.time())
+
+for i,batch in enumerate(fonts_ds.take(20)):
+  print('.',end='')
+
+print()
+
+timeline.append(time.time())
+print(timeline[1] - timeline[0])
+timeline.pop(0)
+
+# Passing batches of text lines todecode_csv runs faster
+fonts_files = tf.data.Dataset.list_files("fonts/*.csv")
+fonts_lines = fonts_files.interleave(
+    lambda fname:tf.data.TextLineDataset(fname).skip(1), 
+    cycle_length=100).batch(BATCH_SIZE)
+
+fonts_fast = fonts_lines.map(lambda x: tf.io.decode_csv(x, record_defaults=font_column_types))
+
+for i,batch in enumerate(fonts_fast.take(20)):
+  print('.',end='')
+
+print()
+
+timeline.append(time.time())
+print(timeline[1] - timeline[0])
+timeline.pop(0)
