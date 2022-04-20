@@ -4,6 +4,8 @@ Created on Tue Apr 19 09:09:41 2022
 
 @author: DELL
 """
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -68,6 +70,17 @@ lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(
   decay_rate=1,
   staircase=False)
 
+batch_size = 5784
+# Create a callback that saves the model's weights every 5 epochs
+checkpoint_path = "training_class/cp-{epoch:04d}.ckpt"
+checkpoint_dir = os.path.dirname(checkpoint_path)
+
+cp_callback = tf.keras.callbacks.ModelCheckpoint(
+    filepath=checkpoint_path, 
+    verbose=1, 
+    save_weights_only=True,
+    save_freq=50*batch_size)
+
 model = tf.keras.Sequential([
     normalizer,
     layers.Dense(128, activation='relu'),
@@ -91,7 +104,8 @@ model.compile(
 history = model.fit(
     train_features,
     train_labels,
-    epochs=2,
+    epochs=3000,
+    callbacks=[cp_callback],
     # Suppress logging.
     # verbose=0,
     # Calculate validation results on 20% of the training data.
