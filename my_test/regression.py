@@ -117,11 +117,12 @@ def to_calss(h_result):
 if __name__ == '__main__':
     csv_200 = 'd:/tmp/风险200.csv'
     csv_50 = 'd:/tmp/风险50.csv'
-    csv_100 = 'd:/tmp/风险100.csv'
+    csv_100 = 'D:/tmp/regression_data/a100.csv'
+    csv = 'D:/tmp/regression_data/a5.csv'
     # train(csv_200, csv_100, csv_50, saved_model='d:/tmp/my_model_drop0')
     
     saved_model='d:/tmp/my_model'
-    h_result = (predict(csv_50))
+    h_result = (predict(csv))
     result = to_calss(h_result)
     
     
